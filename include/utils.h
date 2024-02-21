@@ -38,14 +38,14 @@
     } while (0)
 
 
-template <typename T> void print_vector(const std::vector<T> &data);
+// template <typename T> void print_vector(const std::vector<T> &data);
 
-template <> void print_vector(const std::vector<float> &data) {
-  for (auto &i : data)
-    std::printf("%0.6f\n", i);
-}
+// template <> void print_vector(const std::vector<float> &data) {
+//   for (auto &i : data)
+//     std::printf("%0.6f\n", i);
+// }
 
-template <> void print_vector(const std::vector<unsigned int> &data) {
-  for (auto &i : data)
-    std::printf("%d\n", i);
-}
+// template <> void print_vector(const std::vector<unsigned int> &data) {
+//   for (auto &i : data)
+//     std::printf("%d\n", i);
+// }
