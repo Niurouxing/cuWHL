@@ -4,15 +4,6 @@
 #include "config.h"
 
 
-#if PRECISION == 0
-    using data_type=float;
-    using complex_type = cuFloatComplex;
-    #define make_complex make_cuComplex
-#elif PRECISION == 1
-    using data_type=double;
-    using complex_type = cuDoubleComplex;
-    #define make_complex make_cuDoubleComplex
-#endif
 
 
 

@@ -1,5 +1,6 @@
 #pragma once
 #include <type_traits>
+#include <stdexcept>
 #include "utils.h"
 #include "Cons.h"
 #include <cmath>
@@ -10,48 +11,173 @@ enum class RC
     complex
 };
 
+enum class ModType
+{
+    QAM4,
+    QAM16,
+    QAM64,
+    QAM256
+};
+
+template <RC rc, ModType mod>
+class Detection;
+
 // ConditionallyIncluded Data struct
-template <RC rc>
+template <RC rc, ModType mod>
 struct DetectionUtils
 {
     // None for default
+    friend class Detection<rc, mod>;
 };
 
 // special for real
-template <>
-struct DetectionUtils<RC::real>
+template <ModType mod>
+struct DetectionUtils<RC::real, mod>
 {
+    friend class Detection<RC::real, mod>;
+
+public:
     using valueType = data_type;
     const valueType *Cons2;
 
+    __device__ inline auto getCons()
+    {
+        if constexpr (mod == ModType::QAM4)
+        {
+            return realConsMod2;
+        }
+        else if constexpr (mod == ModType::QAM16)
+        {
+            return realConsMod4;
+        }
+        else if constexpr (mod == ModType::QAM64)
+        {
+            return realConsMod6;
+        }
+        else if constexpr (mod == ModType::QAM256)
+        {
+            return realConsMod8;
+        }
+    }
+
+    __device__ inline auto getCons2()
+    {
+        if constexpr (mod == ModType::QAM4)
+        {
+            return realConsMod2;
+        }
+        else if constexpr (mod == ModType::QAM16)
+        {
+            return realConsMod4;
+        }
+        else if constexpr (mod == ModType::QAM64)
+        {
+            return realConsMod6;
+        }
+        else if constexpr (mod == ModType::QAM256)
+        {
+            return realConsMod8;
+        }
+    }
+
+    __device__ inline auto getBitCons()
+    {
+        if constexpr (mod == ModType::QAM4)
+        {
+            return realBitConsMod2;
+        }
+        else if constexpr (mod == ModType::QAM16)
+        {
+            return realBitConsMod4;
+        }
+        else if constexpr (mod == ModType::QAM64)
+        {
+            return realBitConsMod6;
+        }
+        else if constexpr (mod == ModType::QAM256)
+        {
+            return realBitConsMod8;
+        }
+    }
+
+    inline int getTxAntNum2()
+    {
+        return TxAntNum2;
+    }
+
+    inline int getRxAntNum2()
+    {
+        return RxAntNum2;
+    }
+
+private:
     int TxAntNum2;
     int RxAntNum2;
 };
 
 // special for complex
-template <>
-struct DetectionUtils<RC::complex>
+template <ModType mod>
+struct DetectionUtils<RC::complex, mod>
 {
+    friend class Detection<RC::complex, mod>;
+
+public:
     using valueType = std::conditional_t<std::is_same<data_type, float>::value, cuFloatComplex, cuDoubleComplex>;
+
+    __device__ inline auto getCons()
+    {
+        if constexpr (mod == ModType::QAM4)
+        {
+            return complexConsMod2;
+        }
+        else if constexpr (mod == ModType::QAM16)
+        {
+            return complexConsMod4;
+        }
+        else if constexpr (mod == ModType::QAM64)
+        {
+            return complexConsMod6;
+        }
+        else if constexpr (mod == ModType::QAM256)
+        {
+            return complexConsMod8;
+        }
+    }
+
+    __device__ inline auto getBitCons()
+    {
+        if constexpr (mod == ModType::QAM4)
+        {
+            return complexBitConsMod2;
+        }
+        else if constexpr (mod == ModType::QAM16)
+        {
+            return complexBitConsMod4;
+        }
+        else if constexpr (mod == ModType::QAM64)
+        {
+            return complexBitConsMod6;
+        }
+        else if constexpr (mod == ModType::QAM256)
+        {
+            return complexBitConsMod8;
+        }
+    }
 };
 
-template <RC rc>
-class Detection : public DetectionUtils<rc>
+template <RC rc, ModType mod>
+class Detection : public DetectionUtils<rc, mod>
 {
-public:
-    using valueType = typename DetectionUtils<rc>::valueType;
+private:
+    using valueType = typename DetectionUtils<rc, mod>::valueType;
     int TxAntNum;
     int RxAntNum;
-    int ModType;
     int ConSize;
     int bitLength;
-    valueType SNRdB;
-    valueType Nv;
-    valueType sqrtNvDiv2;
-    valueType NvInv;
-
-    const valueType *Cons;
-    const bool *bitCons;
+    data_type SNRdB;
+    data_type Nv;
+    data_type sqrtNvDiv2;
+    data_type NvInv;
 
     unsigned int *TxIndice;
     bool *TxBits;
@@ -60,69 +186,138 @@ public:
     valueType *RxSymbols;
     valueType *H;
 
-    Detection(int TxAntNum, int RxAntNum, int ModType, double SNRdB)
+public:
+    inline int getTxAntNum()
+    {
+        return TxAntNum;
+    }
+
+    inline int getRxAntNum()
+    {
+        return RxAntNum;
+    }
+
+    inline int getConSize()
+    {
+        return ConSize;
+    }
+
+    inline int getBitLength()
+    {
+        return bitLength;
+    }
+
+    inline void setSNRdB(data_type dB)
+    {
+        SNRdB = dB;
+        if constexpr (rc == RC::real)
+        {
+            Nv = static_cast<data_type>(TxAntNum * RxAntNum / (pow(10, SNRdB / 10) * this->bitLength * 2 * TxAntNum));
+        }
+        else
+        {
+            Nv = static_cast<data_type>(TxAntNum * RxAntNum / (pow(10, SNRdB / 10) * this->bitLength * TxAntNum));
+        }
+
+        sqrtNvDiv2 = std::sqrt(Nv / 2);
+        NvInv = 1 / Nv;
+    }
+
+    inline data_type getSNRdB()
+    {
+        return SNRdB;
+    }
+
+    inline data_type getNv()
+    {
+        return Nv;
+    }
+
+    inline data_type getsqrtNvDiv2()
+    {
+        return sqrtNvDiv2;
+    }
+
+    inline data_type getNvInv()
+    {
+        return NvInv;
+    }
+
+    inline unsigned int *getTxIndice()
+    {
+        return TxIndice;
+    }
+
+    inline bool *getTxBits()
+    {
+        return TxBits;
+    }
+
+    inline valueType *getTxSymbols()
+    {
+        return TxSymbols;
+    }
+
+    inline valueType *getRxSymbols()
+    {
+        return RxSymbols;
+    }
+
+    inline valueType *getH()
+    {
+        return H;
+    }
+
+    Detection(int TxAntNum, int RxAntNum)
     {
         this->TxAntNum = TxAntNum;
-        this->TxAntNum2 = TxAntNum * 2;
+
         this->RxAntNum = RxAntNum;
-        this->ModType = ModType;
-        this->SNRdB = SNRdB;
-
-        CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&this->TxBits), sizeof(unsigned int) * this->TxAntNum * this->ModType));
-
-        this->Nv = static_cast<data_type>(TxAntNum * RxAntNum / (pow(10, SNRdB / 10) * ModType * TxAntNum));
-        this->sqrtNvDiv2 = std::sqrt(Nv / 2);
-        this->NvInv = 1 / Nv;
 
         if constexpr (rc == RC::real)
         {
-            switch (ModType)
+            this->TxAntNum2 = TxAntNum * 2;
+            this->RxAntNum2 = RxAntNum * 2;
+
+            if constexpr (mod == ModType::QAM4)
             {
-            case 2:
                 this->ConSize = 2;
                 this->bitLength = 1;
-
-                this->Cons = realConsMod2;
-                this->Cons2 = realCons2Mod2;
-                this->bitCons = realBitConsMod2;
-                break;
-            case 4:
+            }
+            else if constexpr (mod == ModType::QAM16)
+            {
                 this->ConSize = 4;
                 this->bitLength = 2;
+            }
 
-                this->Cons = realConsMod4;
-                this->Cons2 = realCons2Mod4;
-                this->bitCons = realBitConsMod4;
-                break;
-            case 6:
+            else if constexpr (mod == ModType::QAM64)
+            {
                 this->ConSize = 8;
                 this->bitLength = 3;
-
-                this->Cons = realConsMod6;
-                this->Cons2 = realCons2Mod6;
-                this->bitCons = realBitConsMod6;
-                break;
-            case 8:
+            }
+            else if constexpr (mod == ModType::QAM256)
+            {
                 this->ConSize = 16;
                 this->bitLength = 4;
-
-                this->Cons = realConsMod8;
-                this->Cons2 = realCons2Mod8;
-                this->bitCons = realBitConsMod8;
-                break;
             }
+            else
+            {
+                throw std::runtime_error("ModType not supported");
+            }
+
+            CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&this->TxBits), sizeof(unsigned int) * this->TxAntNum * this->bitLength * 2));
 
             CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&this->TxIndice), sizeof(unsigned int) * this->TxAntNum2));
             CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&this->TxSymbols), sizeof(data_type) * this->TxAntNum2));
-            CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&this->RxSymbols), sizeof(data_type) * this->RxAntNum));
+            CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&this->RxSymbols), sizeof(data_type) * this->RxAntNum2));
 
             CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&this->H), sizeof(data_type) * this->TxAntNum2 * this->RxAntNum2));
         }
         else
         {
-            switch (ModType)
+            if constexpr (mod == ModType::QAM4)
             {
-            case 2:
+
                 if (complexConsInitMod2 == false)
                 {
                     complex_type complexConsMod2_host[4] = {
@@ -139,8 +334,10 @@ public:
 
                 this->Cons = complexConsMod2;
                 this->bitCons = complexBitConsMod2;
-                break;
-            case 4:
+            }
+            else if constexpr (mod == ModType::QAM16)
+
+            {
                 if (complexConsInitMod4 == false)
                 {
                     complex_type complexConsMod4_host[16] = {
@@ -166,11 +363,10 @@ public:
 
                 this->ConSize = 16;
                 this->bitLength = 4;
+            }
 
-                this->Cons = complexConsMod4;
-                this->bitCons = complexBitConsMod4;
-                break;
-            case 6:
+            else if constexpr (mod == ModType::QAM64)
+            {
                 if (complexConsInitMod6 == false)
                 {
                     complex_type complexConsMod6_host[64] = {
@@ -244,11 +440,10 @@ public:
                 }
                 this->ConSize = 64;
                 this->bitLength = 6;
+            }
 
-                this->Cons = complexConsMod6;
-                this->bitCons = complexBitConsMod6;
-                break;
-            case 8:
+            else if constexpr (mod == ModType::QAM256)
+            {
                 if (complexConsInitMod8 == false)
                 {
                     complex_type complexConsMod8_host[256] = {
@@ -514,11 +709,10 @@ public:
                 }
                 this->ConSize = 256;
                 this->bitLength = 8;
-
-                this->Cons = complexConsMod8;
-                this->bitCons = complexBitConsMod8;
-                break;
             }
+
+            CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&this->TxBits), sizeof(unsigned int) * this->TxAntNum * this->bitLength));
+
             CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&this->TxIndice), sizeof(unsigned int) * this->TxAntNum));
             CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&this->TxSymbols), sizeof(valueType) * this->TxAntNum));
             CUDA_CHECK(cudaMalloc(reinterpret_cast<void **>(&this->RxSymbols), sizeof(valueType) * this->RxAntNum));
@@ -529,15 +723,34 @@ public:
 
     void generateChannel()
     {
+        static auto &sebas = Sebas::getInstance();
         if constexpr (rc == RC::real)
         {
-            Sebas<data_type>::getInstance().normalDistribution(this->H, this->TxAntNum * this->RxAntNum2, 0, std::sqrt(0.5));
-
+            sebas.normalDistribution(this->H, this->TxAntNum * this->RxAntNum2, (float)0, (float)std::sqrt(0.5));
+            sebas.RVD(this->H, this->RxAntNum, this->TxAntNum);
         }
         else
         {
-
+            sebas.complexNormalDistribution(this->H, this->TxAntNum * this->RxAntNum, 0, std::sqrt(0.5));
         }
     }
-};
 
+    void generateTxSignals()
+    {
+        static auto &sebas = Sebas::getInstance();
+
+        auto TxAntNumToUse = 0;
+        if constexpr (rc == RC::real)
+        {
+            TxAntNumToUse = this->TxAntNum2;
+        }
+        else
+        {
+            TxAntNumToUse = this->TxAntNum;
+        }
+        sebas.uniformIntDistribution(this->TxIndice, TxAntNumToUse, 0, this->ConSize - 1);
+
+        thrust::transform(thrust::device, this->TxIndice, this->TxIndice + TxAntNumToUse, this->TxSymbols, [this] __device__(unsigned int x)
+                          { return this->getCons()[x]; });
+    }
+};

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <stdexcept>
 #include <vector>
+#include <cuComplex.h>
 
 #include <cuda_runtime.h>
 #include <curand.h>
@@ -37,15 +38,115 @@
         }                                                                                          \
     } while (0)
 
+template <typename T>
+void printVector(T *vec, int n, std::string name = "")
+{
+    std::vector<T> v(n);
+    cudaMemcpy(v.data(), vec, n * sizeof(T), cudaMemcpyDeviceToHost);
+    if (name != "")
+    {
+        printf("%s: \n", name.c_str());
+    }
+    for (int i = 0; i < n; i++)
+    {
+        printf("%f ", static_cast<double>(v[i]));
+    }
+    printf("\n");
+}
 
-// template <typename T> void print_vector(const std::vector<T> &data);
+// cuComplex 和 cuDoubleComplex 重载
+template <>
+void printVector<cuComplex>(cuComplex *vec, int n, std::string name)
+{
+    std::vector<cuComplex> v(n);
+    cudaMemcpy(v.data(), vec, n * sizeof(cuComplex), cudaMemcpyDeviceToHost);
+    if (name != "")
+    {
+        printf("%s: \n", name.c_str());
+    }
+    for (int i = 0; i < n; i++)
+    {
+        printf("(%f, %f) ", v[i].x, v[i].y);
+    }
+    printf("\n");
+}
 
-// template <> void print_vector(const std::vector<float> &data) {
-//   for (auto &i : data)
-//     std::printf("%0.6f\n", i);
-// }
+template <>
+void printVector<cuDoubleComplex>(cuDoubleComplex *vec, int n, std::string name)
+{
+    std::vector<cuDoubleComplex> v(n);
+    cudaMemcpy(v.data(), vec, n * sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost);
+    if (name != "")
+    {
+        printf("%s: \n", name.c_str());
+    }
+    for (int i = 0; i < n; i++)
+    {
+        printf("(%f, %f) ", v[i].x, v[i].y);
+    }
+    printf("\n");
+}
 
-// template <> void print_vector(const std::vector<unsigned int> &data) {
-//   for (auto &i : data)
-//     std::printf("%d\n", i);
-// }
+
+
+// column-major matrix
+template <typename T>
+void printMatrix(T *Mat, int row, int col, std::string name = "") 
+{
+    std::vector<T> vec(row * col);
+    cudaMemcpy(vec.data(), Mat, row * col * sizeof(T), cudaMemcpyDeviceToHost);
+    if (name != "")
+    {
+        printf("%s: \n", name.c_str());
+    }
+    for (int i = 0; i < row; i++)
+    {
+        for (int j = 0; j < col; j++)
+        {
+            printf("%f ", vec[j * row + i]);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+// cuComplex 和 cuDoubleComplex 重载
+template <>
+void printMatrix<cuComplex>(cuComplex *Mat, int row, int col, std::string name)
+{
+    std::vector<cuComplex> vec(row * col);
+    cudaMemcpy(vec.data(), Mat, row * col * sizeof(cuComplex), cudaMemcpyDeviceToHost);
+    if (name != "")
+    {
+        printf("%s: \n", name.c_str());
+    }
+    for (int i = 0; i < row; i++)
+    {
+        for (int j = 0; j < col; j++)
+        {
+            printf("(%f, %f) ", vec[j * row + i].x, vec[j * row + i].y);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
+
+template <>
+void printMatrix<cuDoubleComplex>(cuDoubleComplex *Mat, int row, int col, std::string name)
+{
+    std::vector<cuDoubleComplex> vec(row * col);
+    cudaMemcpy(vec.data(), Mat, row * col * sizeof(cuDoubleComplex), cudaMemcpyDeviceToHost);
+    if (name != "")
+    {
+        printf("%s: \n", name.c_str());
+    }
+    for (int i = 0; i < row; i++)
+    {
+        for (int j = 0; j < col; j++)
+        {
+            printf("(%f, %f) ", vec[j * row + i].x, vec[j * row + i].y);
+        }
+        printf("\n");
+    }
+    printf("\n");
+}
