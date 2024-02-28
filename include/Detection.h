@@ -40,7 +40,7 @@ public:
     using valueType = data_type;
     const valueType *Cons2;
 
-    __device__ inline auto getCons()
+    __device__ static inline auto getCons()
     {
         if constexpr (mod == ModType::QAM4)
         {
@@ -60,7 +60,7 @@ public:
         }
     }
 
-    __device__ inline auto getCons2()
+    __device__ static inline auto getCons2()
     {
         if constexpr (mod == ModType::QAM4)
         {
@@ -80,7 +80,7 @@ public:
         }
     }
 
-    __device__ inline auto getBitCons()
+    __device__ static inline auto getBitCons()
     {
         if constexpr (mod == ModType::QAM4)
         {
@@ -124,7 +124,7 @@ struct DetectionUtils<RC::complex, mod>
 public:
     using valueType = std::conditional_t<std::is_same<data_type, float>::value, cuFloatComplex, cuDoubleComplex>;
 
-    __device__ inline auto getCons()
+    __device__ static inline auto getCons()
     {
         if constexpr (mod == ModType::QAM4)
         {
@@ -144,7 +144,7 @@ public:
         }
     }
 
-    __device__ inline auto getBitCons()
+    __device__ static inline auto getBitCons()
     {
         if constexpr (mod == ModType::QAM4)
         {
@@ -750,7 +750,25 @@ public:
         }
         sebas.uniformIntDistribution(this->TxIndice, TxAntNumToUse, 0, this->ConSize - 1);
 
-        thrust::transform(thrust::device, this->TxIndice, this->TxIndice + TxAntNumToUse, this->TxSymbols, [this] __device__(unsigned int x)
-                          { return this->getCons()[x]; });
+        thrust::transform(thrust::device, this->TxIndice, this->TxIndice + TxAntNumToUse, this->TxSymbols, [] __device__(unsigned int x)
+                          { return DetectionUtils<rc, mod>::getCons()[x]; });
+    }
+
+    void generateRxSignalsWithNoise()
+    {
+        static auto &sebas = Sebas::getInstance();
+
+        if constexpr (rc == RC::real)
+        {
+            sebas.normalDistribution(this->RxSymbols, this->RxAntNum2, (data_type)0, this->sqrtNvDiv2);
+            sebas.MatrixMultiplyVector(this->H, this->RxAntNum2, this->TxAntNum2, false, 1, this->TxSymbols, 1, this->RxSymbols);
+        }
+        else
+        {
+            static auto alpha = make_complex(1, 0);
+            static auto beta = make_complex(1, 0);
+            sebas.complexNormalDistribution(this->RxSymbols, this->RxAntNum, 0, this->sqrtNvDiv2);
+            sebas.MatrixMultiplyVector(this->H, this->RxAntNum, this->TxAntNum, false, alpha, this->TxSymbols, beta, this->RxSymbols);
+        }
     }
 };

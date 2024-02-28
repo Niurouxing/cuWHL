@@ -21,6 +21,9 @@ int main(int argc, char *argv[])
     Detection<RC::real, ModType::QAM16> detReal(Tx, Rx);
     Detection<RC::complex, ModType::QAM16> detComplex(Tx, Rx);
 
+    detReal.setSNRdB(15);
+    detComplex.setSNRdB(15);
+
     detReal.generateChannel();
     detComplex.generateChannel();
 
@@ -37,6 +40,11 @@ int main(int argc, char *argv[])
     printVector(detReal.getTxSymbols(), Tx * 2, "TxSymbolsReal");
     printVector(detComplex.getTxSymbols(), Tx, "TxSymbolsComplex");
 
+    detReal.generateRxSignalsWithNoise();
+    detComplex.generateRxSignalsWithNoise();
+
+    printVector(detReal.getRxSymbols(), Rx * 2, "RxSymbolsReal");
+    printVector(detComplex.getRxSymbols(), Rx, "RxSymbolsComplex");
     return EXIT_SUCCESS;
 }
 

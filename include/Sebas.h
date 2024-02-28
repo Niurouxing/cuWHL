@@ -28,40 +28,6 @@
     }
 
 template <typename T>
-struct SebasUtils;
-
-// float特化
-template <>
-struct SebasUtils<float>
-{
-    __device__ inline static float normal(curandState_t *state, float mean, float stddev)
-    {
-        return curand_normal(state) * stddev + mean;
-    }
-
-    static inline void generateNormal(curandGenerator_t gen, float *A, int n, float mean, float stddev)
-    {
-        CURAND_CHECK(curandGenerateNormal(gen, A, n, mean, stddev));
-    }
-};
-
-// double特化
-template <>
-struct SebasUtils<double>
-{
-    __device__ inline static double normal(curandState_t *state, double mean, double stddev)
-    {
-        return curand_normal_double(state) * stddev + mean;
-    }
-
-    static inline void generateNormal(curandGenerator_t gen, double *A, int n, double mean, double stddev)
-    {
-        CURAND_CHECK(curandGenerateNormalDouble(gen, A, n, mean, stddev));
-    }
-};
-
-
-template <typename T>
 __global__ void RVDKernel(T *matrix, int row, int col)
 {
     // 计算行号和列号
@@ -102,7 +68,8 @@ private:
     cublasHandle_t cublasHandle; // cuBLAS句柄
 
     // 私有化构造函数
-    Sebas() {
+    Sebas()
+    {
         initialize();
     }
 
@@ -110,32 +77,77 @@ private:
     ~Sebas()
     {
         // 销毁CUDA流
-        TRY_CATCH_CALL(cudaStreamDestroy(stream));
+        cudaStreamDestroy(stream);
         // 销毁cuBLAS句柄
-        TRY_CATCH_CALL(cublasDestroy(cublasHandle));
+        cublasDestroy(cublasHandle);
         // 销毁cuRAND生成器
-        TRY_CATCH_CALL(curandDestroyGenerator(gen));
+        curandDestroyGenerator(gen);
         // 释放cuRAND状态数组
-        TRY_CATCH_CALL(cudaFree(d_states));
+        cudaFree(d_states);
     }
 
     // 私有化拷贝构造函数和赋值运算符
     Sebas(const Sebas &) = delete;
     Sebas &operator=(const Sebas &) = delete;
 
-public:
+    __device__ inline float normal(curandState_t *state, float mean, float stddev)
+    {
+        return curand_normal(state) * stddev + mean;
+    }
 
-    void initialize() 
+    __device__ inline double normal(curandState_t *state, double mean, double stddev)
+    {
+        return curand_normal_double(state) * stddev + mean;
+    }
+
+    inline void generateNormal(curandGenerator_t gen, float *A, int n, float mean, float stddev)
+    {
+        CURAND_CHECK(curandGenerateNormal(gen, A, n, mean, stddev));
+    }
+
+    inline void generateNormal(curandGenerator_t gen, double *A, int n, double mean, double stddev)
+    {
+        CURAND_CHECK(curandGenerateNormalDouble(gen, A, n, mean, stddev));
+    }
+
+    inline void gemv(float *A, int row, int cow, bool transpose, float alpha, float *x, float beta, float *y)
+    {
+
+        const float ALPHA = alpha;
+        const float BETA = beta;
+        cublasSgemv(cublasHandle, transpose ? CUBLAS_OP_T : CUBLAS_OP_N, row, cow, &ALPHA, A, row, x, 1, &BETA, y, 1);
+    }
+
+    inline void gemv(double *A, int row, int cow, bool transpose, double alpha, double *x, double beta, double *y)
+    {
+
+        const double ALPHA = alpha;
+        const double BETA = beta;
+        cublasDgemv(cublasHandle, transpose ? CUBLAS_OP_T : CUBLAS_OP_N, row, cow, &ALPHA, A, row, x, 1, &BETA, y, 1);
+    }
+
+    inline void gemv(cuComplex *A, int row, int cow, bool transpose, cuComplex alpha, cuComplex *x, cuComplex beta, cuComplex *y)
+    {
+
+        const cuComplex ALPHA = alpha;
+        const cuComplex BETA = beta;
+        cublasCgemv(cublasHandle, transpose ? CUBLAS_OP_T : CUBLAS_OP_N, row, cow, &ALPHA, A, row, x, 1, &BETA, y, 1);
+    }
+
+    inline void gemv(cuDoubleComplex *A, int row, int cow, bool transpose, cuDoubleComplex alpha, cuDoubleComplex *x, cuDoubleComplex beta, cuDoubleComplex *y)
+    {
+
+        const cuDoubleComplex ALPHA = alpha;
+        const cuDoubleComplex BETA = beta;
+        cublasZgemv(cublasHandle, transpose ? CUBLAS_OP_T : CUBLAS_OP_N, row, cow, &ALPHA, A, row, x, 1, &BETA, y, 1);
+    }
+
+public:
+    void initialize()
     {
         // 创建CUDA流
         cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
-        // 创建cuRAND生成器
-        curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_XORWOW);
-        curandSetStream(gen, stream);
-        // 创建cuBLAS句柄
-        cublasCreate(&cublasHandle);
-        cublasSetStream(cublasHandle, stream);
-
+        // 创建cuRAND生成器 
         // 初始化cuRAND状态数组
         CUDA_CHECK(cudaMalloc((void **)&d_states, MAX_CURAND_STATE * sizeof(curandState_t)));
         unsigned long long seed = time(NULL);
@@ -154,27 +166,21 @@ public:
     }
 
     // 获取CUDA流
-    inline cudaStream_t getStream() const
+    inline cudaStream_t getStream()
     {
         return stream;
     }
 
     // 获取cuRAND生成器
-    inline curandGenerator_t getCurandGenerator() const
+    inline curandGenerator_t getCurandGenerator()
     {
         return gen;
     }
 
     // 获取cuBLAS句柄
-    inline cublasHandle_t getCublasHandle() const
+    inline cublasHandle_t getCublasHandle()
     {
         return cublasHandle;
-    }
-
-    template <typename T = data_type>
-    void normalDistribution(T *A, int n, T mean, T stddev)
-    {
-        SebasUtils<T>::generateNormal(gen, A, n, mean, stddev);
     }
 
     void uniformIntDistribution(unsigned int *A, int n, unsigned int low, unsigned int high)
@@ -182,7 +188,7 @@ public:
         CURAND_CHECK(curandGenerate(gen, A, n));
 
         thrust::transform(thrust::device, A, A + n, A,
-                          [=] __device__(int val)
+                          [high, low] __device__(int val)
                           { return val % (high - low + 1) + low; });
     }
 
@@ -197,17 +203,28 @@ public:
     }
 
     template <typename T = data_type>
-    void complexNormalDistribution(cuComplex *A, int n, float mean, float stddev)
+    void normalDistribution(T *A, int n, T mean, T stddev)
+    {
+        generateNormal(gen, A, n, mean, stddev);
+    }
+
+    template <typename T = data_type>
+    void complexNormalDistribution(complex_type *A, int n, float mean, float stddev)
     {
 
         thrust::for_each(thrust::device,
                          thrust::counting_iterator<int>(0),
                          thrust::counting_iterator<int>(n),
-                         [A, mean, stddev, states = this->d_states] __device__(int idx) mutable
+                         [A, mean, stddev, states = this->d_states, this] __device__(int idx) mutable
                          {
                              curandState_t *state = &states[idx];
-                             A[idx].x = SebasUtils<T>::normal(state, mean, stddev);
-                             A[idx].y = SebasUtils<T>::normal(state, mean, stddev);
+                             A[idx].x = this->normal(state, mean, stddev);
+                             A[idx].y = this->normal(state, mean, stddev);
                          });
+    }
+
+    void MatrixMultiplyVector(auto *A, int row, int cow, bool transpose, auto alpha, auto *x, auto beta, auto *y)
+    {
+        gemv(A, row, cow, transpose, alpha, x, beta, y);
     }
 };
