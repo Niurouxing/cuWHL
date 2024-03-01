@@ -148,6 +148,7 @@ public:
         // 创建CUDA流
         cudaStreamCreateWithFlags(&stream, cudaStreamNonBlocking);
         // 创建cuRAND生成器 
+        CURAND_CHECK(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
         // 初始化cuRAND状态数组
         CUDA_CHECK(cudaMalloc((void **)&d_states, MAX_CURAND_STATE * sizeof(curandState_t)));
         unsigned long long seed = time(NULL);
