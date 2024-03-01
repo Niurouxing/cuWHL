@@ -186,6 +186,11 @@ private:
     valueType *RxSymbols;
     valueType *H;
 
+    static inline bool complexConsInitMod2 = false;
+    static inline bool complexConsInitMod4 = false;
+    static inline bool complexConsInitMod6 = false;
+    static inline bool complexConsInitMod8 = false;
+
 public:
     inline int getTxAntNum()
     {

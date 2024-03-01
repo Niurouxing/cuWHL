@@ -58,11 +58,7 @@ __constant__ complex_type complexConsMod4[16];
 __constant__ complex_type complexConsMod6[64];
 __constant__ complex_type complexConsMod8[256];
 
-// indicators for whether the complexCons are initialized
-static bool complexConsInitMod2 = false;
-static bool complexConsInitMod4 = false;
-static bool complexConsInitMod6 = false;
-static bool complexConsInitMod8 = false;
+ 
 
 constexpr  __constant__ bool complexBitConsMod2[8] = {
                                             0,0,
