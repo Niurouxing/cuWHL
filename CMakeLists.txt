@@ -36,7 +36,7 @@ set_property(TARGET ${PROJECT_NAME}  PROPERTY CUDA_ARCHITECTURES OFF)
 
 target_include_directories(${PROJECT_NAME}  PUBLIC ${CUDA_INCLUDE_DIRS})
 
-target_link_libraries(${PROJECT_NAME}  PUBLIC cublas CUDA::cudart CUDA::curand)
+target_link_libraries(${PROJECT_NAME}  PUBLIC cublas CUDA::cudart CUDA::curand CUDA::cusolver)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

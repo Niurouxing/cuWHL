@@ -99,12 +99,19 @@ void printMatrix(T *Mat, int row, int col, std::string name = "")
     {
         printf("%s: \n", name.c_str());
     }
+
     for (int i = 0; i < row; i++)
     {
         for (int j = 0; j < col; j++)
         {
             printf("%f ", vec[j * row + i]);
+            // print a , after each element except the last one
+            if (j != col - 1)
+            {
+                printf(", ");
+            }
         }
+        printf(";");
         printf("\n");
     }
     printf("\n");

@@ -142,6 +142,9 @@ private:
         cublasZgemv(cublasHandle, transpose ? CUBLAS_OP_T : CUBLAS_OP_N, row, cow, &ALPHA, A, row, x, 1, &BETA, y, 1);
     }
 
+ 
+
+
 public:
     void initialize()
     {
@@ -156,6 +159,8 @@ public:
                          {
                              int id = threadIdx.x + blockIdx.x * blockDim.x;
                              curand_init(seed, id, 0, &state); });
+        // 创建cuBLAS句柄
+        CUBLAS_CHECK(cublasCreate(&cublasHandle));
         cudaDeviceSynchronize();
     }
 
