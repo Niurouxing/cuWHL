@@ -5,6 +5,7 @@
 #include <curand.h>
 #include <curand_kernel.h>
 #include <cublas_v2.h>
+#include <cusolverDn.h>
 #include <thrust/execution_policy.h>
 #include <thrust/transform.h>
 #include <thrust/for_each.h>
@@ -66,6 +67,7 @@ private:
     curandGenerator_t gen;       // cuRAND生成器
     curandState_t *d_states;     // cuRAND状态 用于curand_kernel
     cublasHandle_t cublasHandle; // cuBLAS句柄
+    cusolverDnHandle_t cusolverHandle; // cuSolver句柄
 
     // 私有化构造函数
     Sebas()
@@ -84,6 +86,8 @@ private:
         curandDestroyGenerator(gen);
         // 释放cuRAND状态数组
         cudaFree(d_states);
+        // 销毁cuSolver句柄
+        cusolverDnDestroy(cusolverHandle);
     }
 
     // 私有化拷贝构造函数和赋值运算符
@@ -161,6 +165,8 @@ public:
                              curand_init(seed, id, 0, &state); });
         // 创建cuBLAS句柄
         CUBLAS_CHECK(cublasCreate(&cublasHandle));
+        // 创建cuSolver句柄
+        cusolverDnCreate(&cusolverHandle);
         cudaDeviceSynchronize();
     }
 
@@ -187,6 +193,12 @@ public:
     inline cublasHandle_t getCublasHandle()
     {
         return cublasHandle;
+    }
+
+    // 获取cuSolver句柄
+    inline cusolverDnHandle_t getCusolverHandle()
+    {
+        return cusolverHandle;
     }
 
     void uniformIntDistribution(unsigned int *A, int n, unsigned int low, unsigned int high)
