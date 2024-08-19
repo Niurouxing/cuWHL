@@ -17,13 +17,13 @@ set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_EXTENSIONS OFF)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O0 -g -G -lineinfo --extended-lambda" )
+# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0 -g")
+# set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O0 -g -G -lineinfo --extended-lambda" )
 
 # set(CUDA_NVCC_FLAGS "-g -G")
 
-# set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-# set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 --extended-lambda" )
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -O3 --extended-lambda" )
 
 # add header files in ./utils
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
@@ -31,7 +31,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 file(GLOB_RECURSE CPP_FILES "src/*.cu" "src/*.cpp" )
 
 # add the executable
-add_executable(${PROJECT_NAME}  main.cu ${CPP_FILES})
+add_executable(${PROJECT_NAME}  src/main.cu ${CPP_FILES})
 set_property(TARGET ${PROJECT_NAME}  PROPERTY CUDA_ARCHITECTURES OFF)
 
 target_include_directories(${PROJECT_NAME}  PUBLIC ${CUDA_INCLUDE_DIRS})
