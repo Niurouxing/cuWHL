@@ -145,7 +145,7 @@ public:
     cublasHandle_t cublasHandle;
     cusolverDnHandle_t cusolverHandle;
 
-    int loop = 1;
+    int loop = 2;
 
     static constexpr int TxAntNum = Tx;
     static constexpr int RxAntNum = Rx;
@@ -234,164 +234,122 @@ public:
         float BETA = 0.0;
 
         cublasStatus_t status = cublasSsyrk(cublasHandle, CUBLAS_FILL_MODE_UPPER, CUBLAS_OP_T, 2 * Rx, 2 * Tx, &ALPHA, det.H, 2 * Rx, &BETA, HtH, 2 * Tx);
-        // report any errors
-        if (status != CUBLAS_STATUS_SUCCESS)
-        {
-            printf("cublasSsyrk failed\n");
-        }
-        else
-        {
-            printf("cublasSsyrk success\n");
-        }
+ 
 
-        cudaStreamSynchronize(stream);
+ 
 
 
         // HtY = H^T * Y
         cublasSgemv(cublasHandle, CUBLAS_OP_T, 2 * Rx, 2 * Tx, &ALPHA, det.H, 2 * Rx, det.RxSymbols, 1, &BETA, HtY, 1);
 
-        // sync stream
-        cudaStreamSynchronize(stream);
 
-        float diag[2 * Tx];
-        for (int i = 0; i < 2 * Tx; i++)
-        {
-            cudaMemcpy(diag + i, HtH + i * 2 * Tx + i, sizeof(float), cudaMemcpyDeviceToHost);
-        }
+        cusolverDnSpotrf(cusolverHandle, CUBLAS_FILL_MODE_UPPER, 2 * Tx, HtH, 2 * Tx, d_work, Lwork, d_info);
 
-        bool isDiagPositive = true;
-        printf("HtH diag: ");
-        for (int i = 0; i < 2 * Tx; i++)
-        {
-            printf("%f ", diag[i]);
-            if (diag[i] <= 0)
-            {
-                isDiagPositive = false;
-            }
-        }
-        printf("\n");
-
-
-
-        if (isDiagPositive)
-        {
-            printf("All diag positive begin potrf\n");
-
-            cusolverDnSpotrf(cusolverHandle, CUBLAS_FILL_MODE_UPPER, 2 * Tx, HtH, 2 * Tx, d_work, Lwork, d_info);
-
-            // copy d_info back to host and report
-            int info;
-            cudaMemcpy(&info, d_info, sizeof(int), cudaMemcpyDeviceToHost);
-            if (info != cudaSuccess)
-            {
-                // test shows sucess when Tx = Rx = 16, fails with info = 9 when Tx = Rx = 32
-                printf("spotrf failed, info = %d\n", info);
-            }
-        }
-
-        // cusolverDnSpotrs(cusolverHandle, CUBLAS_FILL_MODE_UPPER, 2 * Tx, 1, HtH, 2 * Tx, HtY, 2 * Tx, d_info);
+ 
+        cusolverDnSpotrs(cusolverHandle, CUBLAS_FILL_MODE_UPPER, 2 * Tx, 1, HtH, 2 * Tx, HtY, 2 * Tx, d_info);
 
         // usually, use i for TxAntNum, j for RxAntNum, k for ConSize
 
-        // float *d_HtY = this->HtY;
-        // float *d_Px = this->Px;
-        // float *d_alpha = this->alpha;
-        // float *d_gamma = this->gamma;
-        // int *d_sIndex = this->sIndex;
+        float *d_HtH = this->HtH;
+        float *d_HtY = this->HtY;
+        float *d_Px = this->Px;
+        float *d_alpha = this->alpha;
+        float *d_gamma = this->gamma;
+        int *d_sIndex = this->sIndex;
 
-        // thrust::for_each(thrust::cuda::par.on(stream),
-        //                  thrust::make_counting_iterator(0), thrust::make_counting_iterator(2 * Tx),
-        //                  [d_alpha, d_HtH, d_HtY, d_Px, d_sIndex, d_gamma] __device__(int i)
-        //                  {
-        //                      // HtY is already the pre-calculated MMSE estimate via cusolver, no need to calculate it again
+        thrust::for_each(thrust::cuda::par.on(stream),
+                         thrust::make_counting_iterator(0), thrust::make_counting_iterator(2 * Tx),
+                         [d_alpha, d_HtH, d_HtY, d_Px, d_sIndex, d_gamma] __device__(int i)
+                         {
+                             // HtY is already the pre-calculated MMSE estimate via cusolver, no need to calculate it again
 
-        //                      // MMSEEst = HtHInv * HtY
+                             // MMSEEst = HtHInv * HtY
 
-        //                      // create temporary distList
-        //                      float distList[ConSize];
+                             // create temporary distList
+                             float distList[ConSize];
 
-        //                      // find the best index
-        //                      float minDist = 1e10;
-        //                      int bestIndex = 0;
-        //                      for (int k = 0; k < ConSize; k++)
-        //                      {
-        //                          float dist = abs(qam::Cons[k] - d_HtY[i]);
-        //                          distList[k] = dist;
-        //                          d_gamma[i * ConSize + k] = -dist;
-        //                          if (dist < minDist)
-        //                          {
-        //                              minDist = dist;
-        //                              bestIndex = k;
-        //                          }
-        //                      }
+                             // find the best index
+                             float minDist = 1e10;
+                             int bestIndex = 0;
+                             for (int k = 0; k < ConSize; k++)
+                             {
+                                 float dist = abs(qam::Cons[k] - d_HtY[i]);
+                                 distList[k] = dist;
+                                 d_gamma[i * ConSize + k] = -dist;
+                                 if (dist < minDist)
+                                 {
+                                     minDist = dist;
+                                     bestIndex = k;
+                                 }
+                             }
 
-        //                      // fill alpha and Px
-        //                      for (int j = 0; j < 2 * RxAntNum; j++)
-        //                      {
-        //                          // alpha [ConSize][2 * TxAntNum][2 * RxAntNum]
+                             // fill alpha and Px
+                             for (int j = 0; j < 2 * RxAntNum; j++)
+                             {
+                                 // alpha [ConSize][2 * TxAntNum][2 * RxAntNum]
 
-        //                          for (int k = 0; k < ConSize; k++)
-        //                          {
-        //                              d_alpha[(i + j * 2 * TxAntNum) * ConSize + k] = d_gamma[i * ConSize + k];
-        //                          }
+                                 for (int k = 0; k < ConSize; k++)
+                                 {
+                                     d_alpha[(i + j * 2 * TxAntNum) * ConSize + k] = d_gamma[i * ConSize + k];
+                                 }
 
-        //                          // Px [ConSize][2 * TxAntNum][2 * RxAntNum]
-        //                          d_Px[(i + j * 2 * TxAntNum) * ConSize + bestIndex] = 1;
-        //                      }
+                                 // Px [ConSize][2 * TxAntNum][2 * RxAntNum]
+                                 d_Px[(i + j * 2 * TxAntNum) * ConSize + bestIndex] = 1;
+                             }
 
-        //                      //  initialize temporary minkRes
-        //                      int minkRes[ConSize];
-        //                      thrust::sequence(thrust::device, minkRes, minkRes + ConSize);
+                             //  initialize temporary minkRes
+                             int minkRes[ConSize];
+                             thrust::sequence(thrust::device, minkRes, minkRes + ConSize);
 
-        //                      //  sort by key
-        //                      thrust::sort_by_key(thrust::device, distList, distList + ConSize, minkRes);
+                             //  sort by key
+                             thrust::sort_by_key(thrust::device, distList, distList + ConSize, minkRes);
 
-        //                      // fill sIndex
-        //                      for (int j = 0; j < 2 * RxAntNum; j++)
-        //                      {
-        //                          for (int k = 0; k < dm; k++)
-        //                          {
-        //                              // sIndex [dm][2 * TxAntNum][2 * RxAntNum]
-        //                              d_sIndex[(i + j * 2 * TxAntNum) * dm + k] = minkRes[k];
-        //                          }
-        //                      }
-        //                  });
+                             // fill sIndex
+                             for (int j = 0; j < 2 * RxAntNum; j++)
+                             {
+                                 for (int k = 0; k < dm; k++)
+                                 {
+                                     // sIndex [dm][2 * TxAntNum][2 * RxAntNum]
+                                     d_sIndex[(i + j * 2 * TxAntNum) * dm + k] = minkRes[k];
+                                 }
+                             }
+                         });
 
-        // // main loop
-        // for (int iter = 0; iter < loop; iter++)
-        // {
-        //     beta_kernel<Tx, Rx, qam, dm><<<2 * RxAntNum, 2 * TxAntNum, 0, stream>>>(sIndex, Px, det.H, det.RxSymbols, beta, det.Nv);
+        // main loop
+        for (int iter = 0; iter < loop; iter++)
+        {
+            beta_kernel<Tx, Rx, qam, dm><<<2 * RxAntNum, 2 * TxAntNum, 0, stream>>>(sIndex, Px, det.H, det.RxSymbols, beta, det.Nv);
 
-        //     // sum beta over RxAntNum to get gamma
-        //     sum_along_RxAntNum_blocks<<<ConSize, 2 * TxAntNum, 0, stream>>>(beta, gamma, ConSize, 2 * RxAntNum, 2 * TxAntNum);
+            // sum beta over RxAntNum to get gamma
+            sum_along_RxAntNum_blocks<<<ConSize, 2 * TxAntNum, 0, stream>>>(beta, gamma, ConSize, 2 * RxAntNum, 2 * TxAntNum);
 
-        //     // // memset alpha to 0
-        //     // cudaMemset(alpha, 0, 4 * TxAntNum * RxAntNum * ConSize * sizeof(float));
+            // // memset alpha to 0
+            // cudaMemset(alpha, 0, 4 * TxAntNum * RxAntNum * ConSize * sizeof(float));
 
-        //     // // memset Px to 0
-        //     // cudaMemset(Px, 0, 4 * TxAntNum * RxAntNum * ConSize * sizeof(float));
+            // // memset Px to 0
+            // cudaMemset(Px, 0, 4 * TxAntNum * RxAntNum * ConSize * sizeof(float));
 
-        //     alpha_kernel<Tx, Rx, qam, dm><<<2 * RxAntNum, 2 * TxAntNum, 0, stream>>>(gamma, beta, sIndex, alpha, Px);
+            alpha_kernel<Tx, Rx, qam, dm><<<2 * RxAntNum, 2 * TxAntNum, 0, stream>>>(gamma, beta, sIndex, alpha, Px);
 
-        // }
+        }
 
-        // // argmax gamma to get TxEst
-        // auto *d_TxEst = this->TxEst;
-        // thrust::for_each(thrust::cuda::par.on(stream),
-        //                  thrust::make_counting_iterator(0), thrust::make_counting_iterator(2 * TxAntNum),
-        //                  [d_gamma, d_TxEst] __device__(int i)
-        //                  {
-        //                      float maxVal = -1e10;
-        //                      int maxIdx = 0;
-        //                      for (int j = 0; j < ConSize; j++)
-        //                      {
-        //                          if (d_gamma[i * ConSize + j] > maxVal)
-        //                          {
-        //                              maxVal = d_gamma[i * ConSize + j];
-        //                              maxIdx = j;
-        //                          }
-        //                      }
-        //                      d_TxEst[i] = maxIdx;
-        //                  });
+        // argmax gamma to get TxEst
+        auto *d_TxEst = this->TxEst;
+        thrust::for_each(thrust::cuda::par.on(stream),
+                         thrust::make_counting_iterator(0), thrust::make_counting_iterator(2 * TxAntNum),
+                         [d_gamma, d_TxEst] __device__(int i)
+                         {
+                             float maxVal = -1e10;
+                             int maxIdx = 0;
+                             for (int j = 0; j < ConSize; j++)
+                             {
+                                 if (d_gamma[i * ConSize + j] > maxVal)
+                                 {
+                                     maxVal = d_gamma[i * ConSize + j];
+                                     maxIdx = j;
+                                 }
+                             }
+                             d_TxEst[i] = maxIdx;
+                         });
     }
 };

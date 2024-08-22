@@ -90,14 +90,16 @@ public:
         cudaMalloc(&curandStates, TxAntNum * RxAntNum * sizeof(curandState_t));
 
         unsigned long long seed = 114514;
+
+
+        auto* d_states = this->curandStates;
         thrust::for_each(thrust::cuda::par.on(stream),
-        curandStates, curandStates + TxAntNum * RxAntNum,
-                         [seed] __device__(curandState_t & state)
+        thrust::make_counting_iterator(0), thrust::make_counting_iterator(TxAntNum * RxAntNum),
+                         [seed,  d_states] __device__(int idx)
                          {
-                             int id = threadIdx.x + blockIdx.x * blockDim.x;
-                             if (id < TxAntNum * RxAntNum)
-                                 curand_init(seed, id, 0, &state);
+                             curand_init(seed, idx, 0, d_states + idx);
                          });
+
     }
 
     // Destructor
@@ -129,7 +131,7 @@ public:
         thrust::make_counting_iterator(0), thrust::make_counting_iterator(2 * TxAntNum),
                          [d_TxIndices, d_states, d_TxSymbols] __device__(int idx)
                          {
-                             int index = curand(&d_states[idx]) % qam::ConSize;
+                             int index = curand(d_states + idx) % qam::ConSize;
                              d_TxIndices[idx] = index;
                              d_TxSymbols[idx] = qam::Cons[index];
                          });
@@ -146,7 +148,7 @@ public:
         thrust::make_counting_iterator(0), thrust::make_counting_iterator(2 * RxAntNum),
                          [d_states, d_RxSymbols, Nv] __device__(int idx)
                          {
-                             d_RxSymbols[idx] += curand_normal(&d_states[idx]) * Nv;
+                             d_RxSymbols[idx] += curand_normal(d_states + idx) * Nv;
                          });
 
     }

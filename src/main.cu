@@ -46,7 +46,7 @@ void printVector(float *vector, int size)
 
     for (int i = 0; i < size; i++)
     {
-        printf("%f ", host[i]);
+        printf("%f ,", host[i]);
     }
     printf("\n");
 
@@ -91,63 +91,25 @@ void printCube(int *cube, int rows, int cols, int pages)
 
 int main()
 {
-    constexpr int Tx = 32;
-    constexpr int Rx = 32;
+    constexpr int Tx = 128;
+    constexpr int Rx = 128;
 
     constexpr int dm = 4;
 
-    auto det = Detection<Tx, Rx, QAM<16, RD>>();
+    auto det = Detection<Tx, Rx, QAM<256, RD>>();
 
     det.generate();
 
     cudaDeviceSynchronize();
 
-    // printf("H\n");
-    // printMatrix(det.H, 2 * Rx, 2 * Tx);
-
-
-    // printf("Rx\n");
-    // printVector(det.RxSymbols, 2 * Rx);
-
-
-
-    auto bsp = BsP<Tx, Rx, QAM<16, RD>, dm>();
+    auto bsp = BsP<Tx, Rx, QAM<256, RD>, dm>();
 
     bsp.execute(det);
 
     cudaDeviceSynchronize();
 
-
-
-    // printf("gamma\n");
-    // printMatrix(bsp.gamma, det.ConSize, 2 * Tx);
-
-
-
-
-    // printf("sIndex\n");
-    // printCube(bsp.sIndex, dm, 2 * Tx, 2 * Rx);
-
-    // // beta
-    // printf("beta\n");
-    // printCube(bsp.beta, det.ConSize, 2 * Rx, 2 * Tx);
-
-    // printf("gamma\n");
-    // printMatrix(bsp.gamma, det.ConSize, 2 * Tx);
-
-
-    // printf("alpha\n");
-    // // [ConSize][2 * TxAntNum][2 * RxAntNum]
-    // printCube(bsp.alpha, det.ConSize, 2 * Tx, 2 * Rx);
-
-    // printf("Px\n");
-    // printCube(bsp.Px, det.ConSize, 2 * Tx, 2 * Rx);
-
-    printf("HtH\n");
-    printMatrix(bsp.HtH, 2 * Tx, 2 * Tx);
-
     printf("Tx\n");
-    printVector(det.TxSymbols, 2 * Tx);
+    // printVector(det.TxSymbols, 2 * Tx);
     printVector(det.TxIndices, 2 * Tx);
     printf("Est\n");
     printVector(bsp.HtY, 2 * Tx);
