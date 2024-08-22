@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.18.0 FATAL_ERROR)
 
 # project name
-set(PROJECT_NAME "cublas_examples")
+set(PROJECT_NAME "CUDA")
 
 project(${PROJECT_NAME} LANGUAGES CXX CUDA)
 

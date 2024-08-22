@@ -89,7 +89,7 @@ public:
     {
         cudaMalloc(&curandStates, TxAntNum * RxAntNum * sizeof(curandState_t));
 
-        unsigned long long seed = time(NULL);
+        unsigned long long seed = 114514;
         thrust::for_each(thrust::cuda::par.on(stream),
         curandStates, curandStates + TxAntNum * RxAntNum,
                          [seed] __device__(curandState_t & state)
@@ -118,7 +118,7 @@ public:
     {
 
         // generate H
-        RVDKernel<<<TxAntNum, RxAntNum, 0, stream>>>(H, TxAntNum, RxAntNum, curandStates);
+        RVDKernel<<<TxAntNum, RxAntNum, 0, stream>>>(H, RxAntNum, TxAntNum, curandStates);
 
 
         int *d_TxIndices = this->TxIndices;
