@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "cuda_runtime.h"
 #include "BsP.h"
+    #include <chrono>
 
 void printMatrix(float *matrix, int rows, int cols)
 {
@@ -98,25 +99,23 @@ int main()
 
     auto det = Detection<Tx, Rx, QAM<256, RD>>();
 
-    det.generate();
-
-    cudaDeviceSynchronize();
-
     auto bsp = BsP<Tx, Rx, QAM<256, RD>, dm>();
 
-    bsp.execute(det);
+    auto start = std::chrono::high_resolution_clock::now();
 
-    cudaDeviceSynchronize();
+    for (int i = 0; i < 100; i++)
+    {
+        det.generate();
 
-    printf("Tx\n");
-    // printVector(det.TxSymbols, 2 * Tx);
-    printVector(det.TxIndices, 2 * Tx);
-    printf("Est\n");
-    printVector(bsp.HtY, 2 * Tx);
+        cudaDeviceSynchronize();
 
-    printf("TxEst\n");
-    printVector(bsp.TxEst, 2 * Tx);
+        bsp.execute(det);
 
+        cudaDeviceSynchronize();
+    }
 
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+    printf("Execution time: %ld milliseconds\n", duration);
 }
-

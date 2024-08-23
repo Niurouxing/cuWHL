@@ -199,8 +199,6 @@ public:
 
         cusolverDnSpotrf_bufferSize(cusolverHandle, CUBLAS_FILL_MODE_UPPER, 2 * Tx, HtH, 2 * Tx, &Lwork);
 
-        printf("Lwork: %d\n", Lwork);
-
         cudaMalloc((void **)&d_work, Lwork * sizeof(float));
         cudaMalloc((void **)&d_info, sizeof(int));
     }
